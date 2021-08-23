@@ -1,16 +1,74 @@
-build:
-  test:
-    image: abakpress/dind-testing
-    pull: true
-    privileged: true
-    volumes:
-      - /home/data/drone/images:/images
-      - /home/data/drone/gems:/bundle
+name: build
+
+kind: pipeline
+type: docker
+
+volumes:
+  - name: images
+    host:
+      path: /home/data/drone/images
+  - name: bundle
+    host:
+      path: /home/data/drone/gems
+  - name: rubygems
+    host:
+      path: /home/data/drone/rubygems
+
+spec_step_common: &spec_step_common
+  image: abakpress/dind-testing:1.0.3
+  pull: if-not-exists
+  privileged: true
+  volumes:
+    - name: images
+      path: /images
+    - name: bundle
+      path: /bundle
+  commands:
+    - prepare-build
+
+    - fetch-images
+      --image abakpress/ruby-app:$RUBY_IMAGE_TAG
+      --image redis:$REDIS_IMAGE_TAG
+    - dip provision
+    - dip rspec
+
+steps:
+  - name: Tests Ruby 2.2
     environment:
-      - COMPOSE_FILE_EXT=drone
-      - RUBY_IMAGE_TAG=2.2-latest
+      COMPOSE_FILE_EXT: drone
+      DOCKER_RUBY_VERSION: 2.2
+      RUBY_IMAGE_TAG: 2.2-latest
+      REDIS_IMAGE_TAG: 4-alpine
+      RAILS_ENV: test
+    <<: *spec_step_common
+
+  - name: Tests Ruby 2.3
+    environment:
+      COMPOSE_FILE_EXT: drone
+      DOCKER_RUBY_VERSION: 2.3
+      RUBY_IMAGE_TAG: 2.3-latest
+      REDIS_IMAGE_TAG: 4-alpine
+      RAILS_ENV: test
+    <<: *spec_step_common
+
+  - name: Tests Ruby 2.4
+    environment:
+      COMPOSE_FILE_EXT: drone
+      DOCKER_RUBY_VERSION: 2.4
+      RUBY_IMAGE_TAG: 2.4-latest
+      REDIS_IMAGE_TAG: 4-alpine
+      RAILS_ENV: test
+    <<: *spec_step_common
+
+  - name: release
+    image: abakpress/gem-publication:latest
+    pull: if-not-exists
+    when:
+      event: push
+      branch: master
+      status: success
+    volumes:
+      - name: rubygems
+        path: /root/.gem
     commands:
-      - wrapdocker docker -v
-      - fetch-images --image abakpress/ruby-app:$RUBY_IMAGE_TAG
-      - dip provision
-      - dip rspec
+      - release-gem --public
