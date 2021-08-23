@@ -2,10 +2,8 @@ require "bundler/setup"
 require "pry-byebug"
 require "keepit"
 
-require "mock_redis"
-
 Keepit.configure do |config|
-  config.redis = ::MockRedis.new
+  config.redis = Redis.new(host: ENV['TEST_REDIS_HOST'])
 end
 
 require "timecop"

@@ -3,5 +3,4 @@ version: '2'
 services:
   app:
     volumes:
-      - .:/app
       - /bundle:/bundle
